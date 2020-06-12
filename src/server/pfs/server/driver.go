@@ -2823,6 +2823,10 @@ func (d *driver) scratchCommitPrefix(commit *pfs.Commit) string {
 }
 
 func (d *driver) checkFilePath(path string) error {
+	return checkFilePath(path)
+}
+
+func checkFilePath(path string) error {
 	path = filepath.Clean(path)
 	if strings.HasPrefix(path, "../") {
 		return errors.Errorf("path (%s) invalid: traverses above root", path)

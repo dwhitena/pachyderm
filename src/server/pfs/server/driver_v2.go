@@ -29,6 +29,7 @@ import (
 	"github.com/pachyderm/pachyderm/src/server/pkg/uuid"
 	"github.com/pachyderm/pachyderm/src/server/pkg/work"
 	"golang.org/x/net/context"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -512,6 +513,21 @@ func (d *driverV2) compactionWorker() {
 }
 
 func (d *driverV2) copyFile(pachClient *client.APIClient, src *pfs.File, dst *pfs.File, overwrite bool) (retErr error) {
-	// validation and auth
-	panic("not implemented")
+	if overwrite {
+		// TODO: after delete merging is sorted out add overwrite support
+		return errors.New("overwrite not yet supported")
+	}
+	return d.withFileSet(pachClient.Ctx(), dst.Commit.Repo.Name, dst.Commit.ID, func(dstFs *fileset.FileSet) error {
+		return d.getTarConditional(pachClient.Ctx(), src.Commit.Repo.Name, src.Commit.ID, src.Path, func(rf *FileReader) error {
+			r, w := io.Pipe()
+			eg := errgroup.Group{}
+			eg.Go(func() error {
+				return rf.Get(w)
+			})
+			eg.Go(func() error {
+				return dstFs.Put(r)
+			})
+			return eg.Wait()
+		})
+	})
 }
